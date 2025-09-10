@@ -5,3 +5,5 @@ Streamlit
 PyYAML
 torch
 seaborn
+flask
+numpy
