@@ -1,6 +1,7 @@
 from flask import Flask, render_template, Response
 import cv2
 from ultralytics import YOLO
+import os
 
 app = Flask(__name__)
 model = YOLO('my_model.pt')  # path to your YOLO model
@@ -37,6 +38,5 @@ def video_feed():
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == '__main__':
-    import os
-    port = int(os.environ.get("PORT", 10000))  # For Render deployment
-    app.run(host='0.0.0.0', port=port, debug=True)
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
