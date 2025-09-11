@@ -14,22 +14,21 @@ def load_yolo_model():
     return YOLO('my_model.pt')  # Replace with your actual trained weights path
 
 model = load_yolo_model()
-# Define a custom video transformer for object detection
-class ObjectDetectionTransformer(VideoTransformerBase):
-    def __init__(self):
-        # Load your object detection model here (e.g., YOLO, OpenCV DNN, etc.)
-        pass
 
-    def transform(self, frame):
+# Define a custom video processor for object detection
+class ObjectDetectionProcessor(VideoProcessorBase):
+    def __init__(self):
+        self.model = model
+
+    def recv(self, frame):
         # Convert the frame to a numpy array
         img = frame.to_ndarray(format="bgr24")
 
-        # Perform object detection on the frame (replace this with your model's logic)
-        # Example: Draw a rectangle on the frame
-        height, width, _ = img.shape
-        cv2.rectangle(img, (50, 50), (width - 50, height - 50), (0, 255, 0), 2)
+        # Perform object detection using YOLO
+        results = self.model(img)  # Run YOLO model on the frame
+        annotated_frame = results[0].plot()  # Annotate the frame with bounding boxes
 
-        return av.VideoFrame.from_ndarray(img, format="bgr24")
+        return av.VideoFrame.from_ndarray(annotated_frame, format="bgr24")
 
 # Streamlit app UI
 st.title("Live Object Detection with Streamlit")
@@ -39,7 +38,7 @@ st.info("Click 'Start' below to begin live object detection using your webcam. "
 # WebRTC streamer for live video feed
 webrtc_streamer(
     key="object-detection",
-    video_transformer_factory=ObjectDetectionTransformer,
+    video_processor_factory=ObjectDetectionProcessor,
     rtc_configuration={
         "iceServers": [
             {"urls": ["stun:stun.l.google.com:19302"]},  # STUN server
@@ -48,6 +47,5 @@ webrtc_streamer(
     },
     async_processing=True,  # Process frames asynchronously for smoother video
 )
-
 st.info("Click 'Start' button above to begin live object detection using your webcam. "
         "Please allow camera permissions in your browser.")
