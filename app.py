@@ -1,6 +1,8 @@
 import streamlit as st
 import cv2
 from ultralytics import YOLO
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
+import av
 
 # Set up page config to use a wide layout
 st.set_page_config(layout="wide")
@@ -13,45 +15,33 @@ model = load_model()
 
 st.title("YOLO11 Live Webcam Object Detection")
 
-# Initialize session state for the webcam to control its state
-if 'webcam_running' not in st.session_state:
-    st.session_state.webcam_running = False
+# --- Video Processing Class ---
+# This class handles the video stream from the user's browser
+class VideoProcessor(VideoTransformerBase):
+    def __init__(self):
+        # We'll load the model here once per session
+        self.model = load_model()
 
-# Create a single checkbox and link it to the session state
-run = st.checkbox('Run Webcam', value=st.session_state.webcam_running)
-
-# Update the session state when the checkbox is clicked
-st.session_state.webcam_running = run
-
-FRAME_WINDOW = st.image([])
-cap = None
-
-if st.session_state.webcam_running:
-    if cap is None:
-        cap = cv2.VideoCapture(0)
-    
-    if not cap.isOpened():
-        st.warning("Failed to open webcam.")
-    else:
-        while st.session_state.webcam_running:
-            ret, frame = cap.read()
-            if not ret:
-                st.write("Failed to capture webcam frame")
-                break
-            
-            # Convert BGR frame to RGB
-            img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
-            # Inference and visualization
-            results = model(img)
-            annotated_frame = results[0].plot()
-            
-            FRAME_WINDOW.image(annotated_frame)
-            
-        cap.release()
-        st.write('Webcam stopped.')
+    def transform(self, frame: av.VideoFrame) -> av.VideoFrame:
+        # Convert the frame to a numpy array for OpenCV/YOLO
+        image = frame.to_ndarray(format="bgr24")
         
-else:
-    st.write('Webcam stopped.')
-    if cap and cap.isOpened():
-        cap.release()
+        # Perform inference on the frame
+        results = self.model(image)
+        
+        # Draw the bounding boxes and labels on the frame
+        annotated_image = results[0].plot()
+
+        # Convert the annotated numpy array back to an av.VideoFrame
+        return av.VideoFrame.from_ndarray(annotated_image, format="bgr24")
+
+# --- Streamlit UI and WebRTC Setup ---
+webrtc_streamer(
+    key="yolo-webcam-detection",
+    video_processor_factory=VideoProcessor,
+    media_stream_constraints={"video": True, "audio": False},
+    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+)
+
+st.write("Click 'Start' above to begin object detection.")
+st.write("If you encounter issues, ensure your browser has webcam permissions.")
