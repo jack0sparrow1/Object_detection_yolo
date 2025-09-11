@@ -1,47 +1,43 @@
 import streamlit as st
-import cv2
 from ultralytics import YOLO
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 import av
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
+import logging
 
-# Set up page config to use a wide layout
 st.set_page_config(layout="wide")
+st.title("YOLO11 Live Webcam Object Detection")
 
-# Load YOLO model and cache it to prevent reloading on every rerun
+# Cache the model to prevent reloading on every rerun
 @st.cache_resource
 def load_model():
     return YOLO('my_model.pt')
+
 model = load_model()
 
-st.title("YOLO11 Live Webcam Object Detection")
-
-# --- Video Processing Class ---
-# This class handles the video stream from the user's browser
+# Video processing class to apply YOLO detection on webcam frames
 class VideoProcessor(VideoTransformerBase):
     def __init__(self):
-        # We'll load the model here once per session
-        self.model = load_model()
+        self.model = model
 
     def transform(self, frame: av.VideoFrame) -> av.VideoFrame:
-        # Convert the frame to a numpy array for OpenCV/YOLO
-        image = frame.to_ndarray(format="bgr24")
-        
-        # Perform inference on the frame
-        results = self.model(image)
-        
-        # Draw the bounding boxes and labels on the frame
-        annotated_image = results[0].plot()
+        try:
+            image = frame.to_ndarray(format="bgr24")
+            results = self.model(image)
+            annotated_image = results[0].plot()
+            return av.VideoFrame.from_ndarray(annotated_image, format="bgr24")
+        except Exception as e:
+            logging.error(f"Error during inference: {e}")
+            return frame  # Return original frame on error
 
-        # Convert the annotated numpy array back to an av.VideoFrame
-        return av.VideoFrame.from_ndarray(annotated_image, format="bgr24")
-
-# --- Streamlit UI and WebRTC Setup ---
-# This single function call handles the entire webcam process
 webrtc_streamer(
-    key="yolo-webcam-detection",
+    key="yolo-live-webcam",
     video_processor_factory=VideoProcessor,
     media_stream_constraints={"video": True, "audio": False},
-    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+    async_processing=True,
 )
 
-st.info("Click 'Start' above to begin object detection. You may need to grant camera permissions.")
+st.info(
+    "Click 'Start' above to begin live object detection.\n"
+    "Grant camera permissions when prompted."
+)
