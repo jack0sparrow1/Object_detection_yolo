@@ -16,36 +16,41 @@ def load_yolo_model():
 model = load_yolo_model()
 
 # Define a custom video processor for object detection
-class ObjectDetectionProcessor(VideoProcessorBase):
+class ObjectDetectionProcessor(VideoTransformerBase):
     def __init__(self):
         self.model = model
 
-    def recv(self, frame):
-        # Convert the frame to a numpy array
-        img = frame.to_ndarray(format="bgr24")
+    def transform(self, frame: av.VideoFrame) -> av.VideoFrame:
+        try:
+            # Convert the frame to a numpy array (BGR format)
+            img = frame.to_ndarray(format="bgr24")
 
-        # Perform object detection using YOLO
-        results = self.model(img)  # Run YOLO model on the frame
-        annotated_frame = results[0].plot()  # Annotate the frame with bounding boxes
+            # Perform object detection using YOLO
+            results = self.model(img)
 
-        return av.VideoFrame.from_ndarray(annotated_frame, format="bgr24")
+            # Annotate the frame with bounding boxes
+            annotated_frame = results[0].plot()
 
-# Streamlit app UI
-st.title("Live Object Detection with Streamlit")
-st.info("Click 'Start' below to begin live object detection using your webcam. "
-        "Please allow camera permissions in your browser.")
+            # Convert back to a video frame and return it
+            return av.VideoFrame.from_ndarray(annotated_frame, format="bgr24")
+        except Exception as e:
+            # Log errors for debugging without crashing the stream
+            logging.error(f"Error during frame processing: {e}")
+            return frame # Return original frame on error
 
-# WebRTC streamer for live video feed
+# Streamlit-webrtc call: starts the webcam video stream with YOLO Detector
 webrtc_streamer(
-    key="object-detection",
+    key="yolo-live-webcam",
     video_processor_factory=ObjectDetectionProcessor,
+    media_stream_constraints={"video": True, "audio": False},
     rtc_configuration={
         "iceServers": [
-            {"urls": ["stun:stun.l.google.com:19302"]},  # STUN server
-            {"urls": ["turn:openrelay.metered.ca:80"], "username": "openrelayproject", "credential": "openrelayproject"}  # Free TURN server
+            {"urls": ["stun:stun.l.google.com:19302"]},
+            {"urls": ["turn:openrelay.metered.ca:80"], "username": "openrelayproject", "credential": "openrelayproject"}
         ]
     },
-    async_processing=True,  # Process frames asynchronously for smoother video
+    async_processing=True,
 )
-st.info("Click 'Start' button above to begin live object detection using your webcam. "
+
+st.info("Click 'Start' above to begin live object detection using your webcam. "
         "Please allow camera permissions in your browser.")
