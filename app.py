@@ -1,42 +1,57 @@
-from flask import Flask, render_template, Response
+import streamlit as st
 import cv2
 from ultralytics import YOLO
-import os
 
-app = Flask(__name__)
-model = YOLO('my_model.pt')  # path to your YOLO model
+# Set up page config to use a wide layout
+st.set_page_config(layout="wide")
 
-def gen_frames():
-    cap = cv2.VideoCapture(0)
-    while True:
-        success, frame = cap.read()
-        if not success:
-            break
+# Load YOLO model and cache it to prevent reloading on every rerun
+@st.cache_resource
+def load_model():
+    return YOLO('my_model.pt')
+model = load_model()
 
-        # Convert frame to RGB for YOLO
-        img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = model(img_rgb)
-        annotated_frame = results[0].plot()  # draw detections
+st.title("YOLO11 Live Webcam Object Detection")
 
-        # Convert back to BGR for OpenCV display/streaming
-        annotated_frame_bgr = cv2.cvtColor(annotated_frame, cv2.COLOR_RGB2BGR)
-        ret, buffer = cv2.imencode('.jpg', annotated_frame_bgr)
-        frame_bytes = buffer.tobytes()
+# Initialize session state for the webcam to control its state
+if 'webcam_running' not in st.session_state:
+    st.session_state.webcam_running = False
 
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-    cap.release()
+# Create a single checkbox and link it to the session state
+run = st.checkbox('Run Webcam', value=st.session_state.webcam_running)
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+# Update the session state when the checkbox is clicked
+st.session_state.webcam_running = run
 
-@app.route('/video_feed')
-def video_feed():
-    # Returns a multipart response with streaming frames
-    return Response(gen_frames(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+FRAME_WINDOW = st.image([])
+cap = None
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port)
+if st.session_state.webcam_running:
+    if cap is None:
+        cap = cv2.VideoCapture(0)
+    
+    if not cap.isOpened():
+        st.warning("Failed to open webcam.")
+    else:
+        while st.session_state.webcam_running:
+            ret, frame = cap.read()
+            if not ret:
+                st.write("Failed to capture webcam frame")
+                break
+            
+            # Convert BGR frame to RGB
+            img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            # Inference and visualization
+            results = model(img)
+            annotated_frame = results[0].plot()
+            
+            FRAME_WINDOW.image(annotated_frame)
+            
+        cap.release()
+        st.write('Webcam stopped.')
+        
+else:
+    st.write('Webcam stopped.')
+    if cap and cap.isOpened():
+        cap.release()
