@@ -11,22 +11,23 @@ st.title("YOLO11 Live Webcam Object Detection")
 # Cache model loading so it happens once per session
 @st.cache_resource
 def load_yolo_model():
-    return YOLO('my_model.pt')  # Replace with your actual trained weights path
+    return YOLO('my_model.pt')
 
 model = load_yolo_model()
 
 # Define a custom video processor for object detection
+# We're now using VideoTransformerBase, which is the correct class
 class ObjectDetectionProcessor(VideoTransformerBase):
     def __init__(self):
         self.model = model
 
-    def transform(self, frame: av.VideoFrame) -> av.VideoFrame:
+    def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
         try:
             # Convert the frame to a numpy array (BGR format)
             img = frame.to_ndarray(format="bgr24")
 
-            # Perform object detection using YOLO
-            results = self.model(img)
+            # Perform object detection using YOLO, explicitly setting the image size
+            results = self.model(img, imgsz=320)
 
             # Annotate the frame with bounding boxes
             annotated_frame = results[0].plot()
