@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 import base64
 from ultralytics import YOLO
+import os
 
 app = Flask(__name__)
 
@@ -36,5 +37,7 @@ def upload_file():
             img_data = inference_img(img_bytes)
     return render_template('index.html', img_data=img_data)
 
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
