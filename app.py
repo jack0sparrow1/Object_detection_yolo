@@ -1,43 +1,42 @@
-from flask import Flask, request, render_template
-import numpy as np
+from flask import Flask, render_template, Response
 import cv2
-import base64
 from ultralytics import YOLO
-import os
 
 app = Flask(__name__)
+model = YOLO('my_model.pt')  # path to your YOLO model
 
-# Load YOLO model (Ultralytics-style)
-model = YOLO('my_model.pt')
+def gen_frames():
+    cap = cv2.VideoCapture(0)
+    while True:
+        success, frame = cap.read()
+        if not success:
+            break
 
-def inference_img(image_bytes):
-    # Convert bytes to numpy image (RGB)
-    npimg = np.frombuffer(image_bytes, np.uint8)
-    img = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        # Convert frame to RGB for YOLO
+        img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = model(img_rgb)
+        annotated_frame = results[0].plot()  # draw detections
 
-    # Run inference
-    results = model(img_rgb)
+        # Convert back to BGR for OpenCV display/streaming
+        annotated_frame_bgr = cv2.cvtColor(annotated_frame, cv2.COLOR_RGB2BGR)
+        ret, buffer = cv2.imencode('.jpg', annotated_frame_bgr)
+        frame_bytes = buffer.tobytes()
 
-    # Render annotated image
-    annotated_img = results[0].plot()  # Ultralytics API
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+    cap.release()
 
-    # Convert annotated image to base64 for HTML
-    _, buffer = cv2.imencode('.jpg', cv2.cvtColor(annotated_img, cv2.COLOR_RGB2BGR))
-    encoded_img = base64.b64encode(buffer).decode('utf-8')
-    return encoded_img
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-@app.route('/', methods=['GET', 'POST'])
-def upload_file():
-    img_data = None
-    if request.method == 'POST':
-        file = request.files.get('image')
-        if file:
-            img_bytes = file.read()
-            img_data = inference_img(img_bytes)
-    return render_template('index.html', img_data=img_data)
-
+@app.route('/video_feed')
+def video_feed():
+    # Returns a multipart response with streaming frames
+    return Response(gen_frames(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port)
+    import os
+    port = int(os.environ.get("PORT", 10000))  # For Render deployment
+    app.run(host='0.0.0.0', port=port, debug=True)
