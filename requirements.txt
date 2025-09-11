@@ -1,5 +1,5 @@
 ipykernel
-opencv-python
+opencv-python-headless
 Ultralytics
 Streamlit
 PyYAML
