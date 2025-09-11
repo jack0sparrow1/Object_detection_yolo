@@ -36,6 +36,7 @@ class VideoProcessor(VideoTransformerBase):
         return av.VideoFrame.from_ndarray(annotated_image, format="bgr24")
 
 # --- Streamlit UI and WebRTC Setup ---
+# This single function call handles the entire webcam process
 webrtc_streamer(
     key="yolo-webcam-detection",
     video_processor_factory=VideoProcessor,
@@ -43,5 +44,4 @@ webrtc_streamer(
     rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
 )
 
-st.write("Click 'Start' above to begin object detection.")
-st.write("If you encounter issues, ensure your browser has webcam permissions.")
+st.info("Click 'Start' above to begin object detection. You may need to grant camera permissions.")
