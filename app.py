@@ -26,7 +26,7 @@ class YOLODetector(VideoTransformerBase):
             img = frame.to_ndarray(format="bgr24")
 
             # Run YOLO inference, specifying a smaller image size for speed
-            results = self.model(img, imgsz=320) # Optimization
+            results = self.model(img, imgsz=320)  # Optimization
 
             # Draw bounding boxes and labels on the frame
             annotated_img = results[0].plot()
@@ -46,7 +46,7 @@ webrtc_streamer(
     rtc_configuration={
         "iceServers": [
             {"urls": ["stun:stun.l.google.com:19302"]},  # STUN server
-            {"urls": ["turn:openrelay.metered.ca:80"], "username": "openrelayproject", "credential": "openrelayproject"} # Free TURN server
+            {"urls": ["turn:openrelay.metered.ca:80"], "username": "openrelayproject", "credential": "openrelayproject"}  # Free TURN server
         ]
     },
     async_processing=True,  # process frames asynchronously for smoother video
